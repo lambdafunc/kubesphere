@@ -19,14 +19,16 @@ package tlsutil
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 )
 
 // NewClientTLS returns tls.Config appropriate for client auth.
-func NewClientTLS(certFile, keyFile, caFile string) (*tls.Config, error) {
-	config := tls.Config{}
+func NewClientTLS(certFile, keyFile, caFile string, insecureSkipTLSverify bool) (*tls.Config, error) {
+	config := tls.Config{
+		InsecureSkipVerify: insecureSkipTLSverify,
+	}
 
 	if certFile != "" && keyFile != "" {
 		cert, err := CertFromFilePair(certFile, keyFile)
@@ -52,7 +54,7 @@ func NewClientTLS(certFile, keyFile, caFile string) (*tls.Config, error) {
 // Returns an error if the file could not be read, a certificate could not
 // be parsed, or if the file does not contain any certificates
 func CertPoolFromFile(filename string) (*x509.CertPool, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Errorf("can't read CA file: %v", filename)
 	}
@@ -63,7 +65,7 @@ func CertPoolFromFile(filename string) (*x509.CertPool, error) {
 	return cp, nil
 }
 
-// CertFromFilePair returns an tls.Certificate containing the
+// CertFromFilePair returns a tls.Certificate containing the
 // certificates public/private key pair from a pair of given PEM-encoded files.
 // Returns an error if the file could not be read, a certificate could not
 // be parsed, or if the file does not contain any certificates

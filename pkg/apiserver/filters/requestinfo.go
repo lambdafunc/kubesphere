@@ -1,18 +1,7 @@
 /*
-Copyright 2020 The KubeSphere Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package filters
 
@@ -26,7 +15,7 @@ import (
 	"kubesphere.io/kubesphere/pkg/apiserver/request"
 )
 
-func WithRequestInfo(handler http.Handler, resolver request.RequestInfoResolver) http.Handler {
+func WithRequestInfo(next http.Handler, resolver request.RequestInfoResolver) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// KubeSphere supports kube-apiserver proxy requests in multicluster mode. But kube-apiserver
 		// stripped all authorization headers. Use custom header to carry token to avoid losing authentication token.
@@ -65,7 +54,7 @@ func WithRequestInfo(handler http.Handler, resolver request.RequestInfoResolver)
 			return
 		}
 
-		req = req.WithContext(request.WithRequestInfo(ctx, info))
-		handler.ServeHTTP(w, req)
+		*req = *req.WithContext(request.WithRequestInfo(ctx, info))
+		next.ServeHTTP(w, req)
 	})
 }

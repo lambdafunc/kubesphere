@@ -1,44 +1,32 @@
 /*
-Copyright 2020 The KubeSphere Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package oidc
 
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
-	"kubesphere.io/kubesphere/pkg/utils/sliceutil"
+	"github.com/coreos/go-oidc/v3/oidc"
 
-	"github.com/coreos/go-oidc"
-	"github.com/form3tech-oss/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/mitchellh/mapstructure"
 	"golang.org/x/oauth2"
 
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/identityprovider"
-	"kubesphere.io/kubesphere/pkg/apiserver/authentication/oauth"
+	"kubesphere.io/kubesphere/pkg/server/options"
+	"kubesphere.io/kubesphere/pkg/utils/sliceutil"
 )
 
 func init() {
-	identityprovider.RegisterOAuthProvider(&oidcProviderFactory{})
+	identityprovider.RegisterOAuthProviderFactory(&oidcProviderFactory{})
 }
 
 type oidcProvider struct {
@@ -116,7 +104,7 @@ type oidcIdentity struct {
 }
 
 func (o oidcIdentity) GetUserID() string {
-	return base64.RawURLEncoding.EncodeToString([]byte(o.Sub))
+	return o.Sub
 }
 
 func (o oidcIdentity) GetUsername() string {
@@ -134,9 +122,9 @@ func (f *oidcProviderFactory) Type() string {
 	return "OIDCIdentityProvider"
 }
 
-func (f *oidcProviderFactory) Create(options oauth.DynamicOptions) (identityprovider.OAuthProvider, error) {
+func (f *oidcProviderFactory) Create(opts options.DynamicOptions) (identityprovider.OAuthProvider, error) {
 	var oidcProvider oidcProvider
-	if err := mapstructure.Decode(options, &oidcProvider); err != nil {
+	if err := mapstructure.Decode(opts, &oidcProvider); err != nil {
 		return nil, err
 	}
 	// dynamically discover
@@ -170,7 +158,7 @@ func (f *oidcProviderFactory) Create(options oauth.DynamicOptions) (identityprov
 			// TODO: support HS256
 			ClientID: oidcProvider.ClientID,
 		})
-		options["endpoint"] = oauth.DynamicOptions{
+		opts["endpoint"] = options.DynamicOptions{
 			"authURL":       oidcProvider.Endpoint.AuthURL,
 			"tokenURL":      oidcProvider.Endpoint.TokenURL,
 			"userInfoURL":   oidcProvider.Endpoint.UserInfoURL,

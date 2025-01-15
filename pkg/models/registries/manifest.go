@@ -1,18 +1,7 @@
 /*
-Copyright 2020 KubeSphere Authors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package registries
 
@@ -22,8 +11,8 @@ import (
 	"net/http"
 
 	"github.com/docker/distribution/manifest/schema2"
-	"github.com/emicklei/go-restful"
-	log "k8s.io/klog"
+	"github.com/emicklei/go-restful/v3"
+	"k8s.io/klog/v2"
 )
 
 var statusUnauthorized = "Not found or unauthorized"
@@ -52,10 +41,10 @@ func (r *Registry) ImageManifest(image Image, token string) (*ImageManifest, err
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized {
-			log.Error(statusUnauthorized)
+			klog.Error(statusUnauthorized)
 			return nil, restful.NewError(resp.StatusCode, statusUnauthorized)
 		}
-		log.Errorf("got response: statusCode is '%d', body is '%s'\n", resp.StatusCode, respBody)
+		klog.Errorf("got response: statusCode is '%d', body is '%s'\n", resp.StatusCode, respBody)
 		return nil, restful.NewError(resp.StatusCode, "got image manifest failed")
 	}
 

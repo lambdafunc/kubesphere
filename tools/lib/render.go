@@ -1,18 +1,7 @@
 /*
-Copyright 2020 The KubeSphere Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package lib
 
@@ -23,26 +12,27 @@ import (
 	"net"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apiserver/pkg/registry/rest"
-
-	"github.com/go-openapi/spec"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kube-openapi/pkg/common/restfuladapter"
 
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
+	kubespec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type Config struct {
 	Scheme *runtime.Scheme
 	Codecs serializer.CodecFactory
 
-	Info               spec.InfoProps
+	Info               kubespec.InfoProps
 	OpenAPIDefinitions []common.GetOpenAPIDefinitions
 	Resources          []schema.GroupVersionResource
 	Mapper             *meta.DefaultRESTMapper
@@ -78,7 +68,7 @@ func RenderOpenAPISpec(cfg Config) (string, error) {
 	recommendedOptions.Etcd = nil
 	recommendedOptions.Authentication = nil
 	recommendedOptions.Authorization = nil
-	recommendedOptions.CoreAPI = nil
+	recommendedOptions.CoreAPI.CoreAPIKubeconfigPath = clientcmd.NewDefaultPathOptions().GetDefaultFilename()
 	recommendedOptions.Admission = nil
 
 	// TODO have a "real" external address
@@ -94,6 +84,8 @@ func RenderOpenAPISpec(cfg Config) (string, error) {
 	}
 	serverConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(cfg.GetOpenAPIDefinitions, apiopenapi.NewDefinitionNamer(cfg.Scheme))
 	serverConfig.OpenAPIConfig.Info.InfoProps = cfg.Info
+	serverConfig.OpenAPIV3Config = genericapiserver.DefaultOpenAPIV3Config(cfg.GetOpenAPIDefinitions, apiopenapi.NewDefinitionNamer(cfg.Scheme))
+	serverConfig.OpenAPIV3Config.Info.InfoProps = cfg.Info
 
 	genericServer, err := serverConfig.Complete().New("stash-server", genericapiserver.NewEmptyDelegate()) // completion is done in Complete, no need for a second time
 	if err != nil {
@@ -130,9 +122,10 @@ func RenderOpenAPISpec(cfg Config) (string, error) {
 			}
 
 			resmap[gvr.Resource] = ResourceInfo{
-				gvk:  gvk,
-				obj:  obj,
-				list: list,
+				gvk:          gvk,
+				obj:          obj,
+				list:         list,
+				singularName: gvr.Resource,
 			}
 		}
 
@@ -165,7 +158,7 @@ func RenderOpenAPISpec(cfg Config) (string, error) {
 		}
 	}
 
-	spec, err := builder.BuildOpenAPISpec(genericServer.Handler.GoRestfulContainer.RegisteredWebServices(), serverConfig.OpenAPIConfig)
+	spec, err := builder.BuildOpenAPISpecFromRoutes(restfuladapter.AdaptWebServices(genericServer.Handler.GoRestfulContainer.RegisteredWebServices()), serverConfig.OpenAPIConfig)
 	if err != nil {
 		log.Fatal(err)
 		return "", err

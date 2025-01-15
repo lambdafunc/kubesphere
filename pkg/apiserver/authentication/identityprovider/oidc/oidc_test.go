@@ -1,20 +1,7 @@
 /*
-
- Copyright 2020 The KubeSphere Authors.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package oidc
 
@@ -33,14 +20,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/form3tech-oss/jwt-go"
-	. "github.com/onsi/ginkgo"
+	"kubesphere.io/kubesphere/pkg/server/options"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/golang-jwt/jwt/v4"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
-	"gopkg.in/square/go-jose.v2"
 
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/identityprovider"
-	"kubesphere.io/kubesphere/pkg/apiserver/authentication/oauth"
 )
 
 var (
@@ -52,7 +40,7 @@ func TestOIDC(t *testing.T) {
 	RunSpecs(t, "OIDC Identity Provider Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	privateKey, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	Expect(err).Should(BeNil())
 	jwk := jose.JSONWebKey{
@@ -151,8 +139,7 @@ var _ = BeforeSuite(func(done Done) {
 		w.Header().Add("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(data)
 	}))
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
@@ -167,7 +154,7 @@ var _ = Describe("OIDC", func() {
 			err      error
 		)
 		It("should configure successfully", func() {
-			config := oauth.DynamicOptions{
+			config := options.DynamicOptions{
 				"issuer":             oidcServer.URL,
 				"clientID":           "kubesphere",
 				"clientSecret":       "c53e80ab92d48ab12f4e7f1f6976d1bdc996e0d7",
@@ -177,13 +164,13 @@ var _ = Describe("OIDC", func() {
 			factory := oidcProviderFactory{}
 			provider, err = factory.Create(config)
 			Expect(err).Should(BeNil())
-			expected := oauth.DynamicOptions{
+			expected := options.DynamicOptions{
 				"issuer":             oidcServer.URL,
 				"clientID":           "kubesphere",
 				"clientSecret":       "c53e80ab92d48ab12f4e7f1f6976d1bdc996e0d7",
 				"redirectURL":        "https://ks-console.kubesphere-system.svc/oauth/redirect/oidc",
 				"insecureSkipVerify": true,
-				"endpoint": oauth.DynamicOptions{
+				"endpoint": options.DynamicOptions{
 					"authURL":       fmt.Sprintf("%s/authorize", oidcServer.URL),
 					"tokenURL":      fmt.Sprintf("%s/token", oidcServer.URL),
 					"userInfoURL":   fmt.Sprintf("%s/userinfo", oidcServer.URL),
@@ -198,7 +185,7 @@ var _ = Describe("OIDC", func() {
 			req := &http.Request{URL: url}
 			identity, err := provider.IdentityExchangeCallback(req)
 			Expect(err).Should(BeNil())
-			Expect(identity.GetUserID()).Should(Equal(base64.RawURLEncoding.EncodeToString([]byte("110169484474386276334"))))
+			Expect(identity.GetUserID()).Should(Equal("110169484474386276334"))
 			Expect(identity.GetUsername()).Should(Equal("test"))
 			Expect(identity.GetEmail()).Should(Equal("test@kubesphere.io"))
 		})

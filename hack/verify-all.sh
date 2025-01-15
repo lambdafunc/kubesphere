@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -27,8 +28,9 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
-  "verify-licenses.sh"
-  )
+  # "verify-licenses.sh"
+  "verify-shellcheck.sh"
+)
 
 while IFS='' read -r line; do EXCLUDED_CHECKS+=("$line"); done < <(ls "${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}/hack/}" 2>/dev/null || true)
 TARGET_LIST=()

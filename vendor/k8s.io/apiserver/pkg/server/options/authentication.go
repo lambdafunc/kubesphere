@@ -17,22 +17,24 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
-
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
@@ -75,6 +77,16 @@ func (s *RequestHeaderAuthenticationOptions) Validate() []error {
 		allErrors = append(allErrors, err)
 	}
 
+	if len(s.UsernameHeaders) > 0 && !caseInsensitiveHas(s.UsernameHeaders, "X-Remote-User") {
+		klog.Warningf("--requestheader-username-headers is set without specifying the standard X-Remote-User header - API aggregation will not work")
+	}
+	if len(s.GroupHeaders) > 0 && !caseInsensitiveHas(s.GroupHeaders, "X-Remote-Group") {
+		klog.Warningf("--requestheader-group-headers is set without specifying the standard X-Remote-Group header - API aggregation will not work")
+	}
+	if len(s.ExtraHeaderPrefixes) > 0 && !caseInsensitiveHas(s.ExtraHeaderPrefixes, "X-Remote-Extra-") {
+		klog.Warningf("--requestheader-extra-headers-prefix is set without specifying the standard X-Remote-Extra- header prefix - API aggregation will not work")
+	}
+
 	return allErrors
 }
 
@@ -86,6 +98,15 @@ func checkForWhiteSpaceOnly(flag string, headerNames ...string) error {
 	}
 
 	return nil
+}
+
+func caseInsensitiveHas(headers []string, header string) bool {
+	for _, h := range headers {
+		if strings.EqualFold(h, header) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -198,6 +219,12 @@ type DelegatingAuthenticationOptions struct {
 	// TokenRequestTimeout specifies a time limit for requests made by the authorization webhook client.
 	// The default value is set to 10 seconds.
 	TokenRequestTimeout time.Duration
+
+	// CustomRoundTripperFn allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
+	CustomRoundTripperFn transport.WrapperFunc
+
+	// Anonymous gives user an option to enable/disable Anonymous authentication.
+	Anonymous *apiserver.AnonymousAuthConfig
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -212,6 +239,7 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 		},
 		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
 		TokenRequestTimeout: 10 * time.Second,
+		Anonymous:           &apiserver.AnonymousAuthConfig{Enabled: true},
 	}
 }
 
@@ -223,6 +251,11 @@ func (s *DelegatingAuthenticationOptions) WithCustomRetryBackoff(backoff wait.Ba
 // WithRequestTimeout sets the given timeout for requests made by the authentication webhook client.
 func (s *DelegatingAuthenticationOptions) WithRequestTimeout(timeout time.Duration) {
 	s.TokenRequestTimeout = timeout
+}
+
+// WithCustomRoundTripper allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
+func (s *DelegatingAuthenticationOptions) WithCustomRoundTripper(rt transport.WrapperFunc) {
+	s.CustomRoundTripperFn = rt
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
@@ -274,7 +307,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:                true,
+		Anonymous:                &apiserver.AnonymousAuthConfig{Enabled: true},
 		CacheTTL:                 s.CacheTTL,
 		WebhookRetryBackoff:      s.WebhookRetryBackoff,
 		TokenAccessReviewTimeout: s.TokenRequestTimeout,
@@ -287,7 +320,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 
 	// configure token review
 	if client != nil {
-		cfg.TokenAccessReviewClient = client.AuthenticationV1().TokenReviews()
+		cfg.TokenAccessReviewClient = client.AuthenticationV1()
 	}
 
 	// get the clientCA information
@@ -345,6 +378,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 	if requestHeaderConfig != nil {
 		cfg.RequestHeaderConfig = requestHeaderConfig
+		authenticationInfo.RequestHeaderConfig = requestHeaderConfig
 		if err = authenticationInfo.ApplyClientCert(cfg.RequestHeaderConfig.CAContentProvider, servingInfo); err != nil {
 			return fmt.Errorf("unable to load request-header-client-ca-file: %v", err)
 		}
@@ -379,7 +413,10 @@ func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kuber
 	}
 
 	//  look up authentication configuration in the cluster and in case of an err defer to authentication-tolerate-lookup-failure flag
-	if err := dynamicRequestHeaderProvider.RunOnce(); err != nil {
+	//  We are passing the context to ProxyCerts.RunOnce as it needs to implement RunOnce(ctx) however the
+	//  context is not used at all. So passing a empty context shouldn't be a problem
+	ctx := context.TODO()
+	if err := dynamicRequestHeaderProvider.RunOnce(ctx); err != nil {
 		return nil, err
 	}
 
@@ -424,6 +461,9 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	// if multiple timeouts were set, the request will pick the smaller timeout to be applied, leaving other useless.
 	//
 	// see https://github.com/golang/go/blob/a937729c2c2f6950a32bc5cd0f5b88700882f078/src/net/http/client.go#L364
+	if s.CustomRoundTripperFn != nil {
+		clientConfig.Wrap(s.CustomRoundTripperFn)
+	}
 
 	return kubernetes.NewForConfig(clientConfig)
 }

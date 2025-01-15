@@ -1,19 +1,3 @@
-/*
-Copyright 2019 The KubeSphere Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package cache
 
 import (
@@ -66,8 +50,8 @@ func dump(client Interface) (map[string]string, error) {
 func TestDeleteAndExpireCache(t *testing.T) {
 	var testCases = []struct {
 		description    string
-		deleteKeys     sets.String
-		expireKeys     sets.String
+		deleteKeys     sets.Set[string]
+		expireKeys     sets.Set[string]
 		expireDuration time.Duration // never use a 0(NeverExpires) duration with expireKeys, recommend time.Millisecond * 500.
 		expected       map[string]string
 	}{
@@ -88,7 +72,7 @@ func TestDeleteAndExpireCache(t *testing.T) {
 				"foo2": "val2",
 				"foo3": "val3",
 			},
-			deleteKeys: sets.NewString("bar1", "bar2"),
+			deleteKeys: sets.New("bar1", "bar2"),
 		},
 		{
 			description: "Should get only keys start with bar",
@@ -97,7 +81,7 @@ func TestDeleteAndExpireCache(t *testing.T) {
 				"bar2": "val2",
 			},
 			expireDuration: time.Millisecond * 500,
-			expireKeys:     sets.NewString("foo1", "foo2", "foo3"),
+			expireKeys:     sets.New("foo1", "foo2", "foo3"),
 		},
 	}
 
@@ -111,14 +95,14 @@ func TestDeleteAndExpireCache(t *testing.T) {
 			}
 
 			if len(testCase.deleteKeys) != 0 {
-				err = cacheClient.Del(testCase.deleteKeys.List()...)
+				err = cacheClient.Del(testCase.deleteKeys.UnsortedList()...)
 				if err != nil {
 					t.Fatalf("Error delete keys, %v", err)
 				}
 			}
 
 			if len(testCase.expireKeys) != 0 && testCase.expireDuration != 0 {
-				for _, key := range testCase.expireKeys.List() {
+				for _, key := range testCase.expireKeys.UnsortedList() {
 					err = cacheClient.Expire(key, testCase.expireDuration)
 					if err != nil {
 						t.Fatalf("Error expire keys, %v", err)

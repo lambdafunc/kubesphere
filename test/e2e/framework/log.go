@@ -1,19 +1,3 @@
-/*
-Copyright 2020 KubeSphere Authors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package framework
 
 import (
@@ -23,7 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	"kubesphere.io/kubesphere/test/e2e/framework/ginkgowrapper"
 )
@@ -75,10 +59,10 @@ var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)
 // entries coming from Ginkgo.
 //
 // This is a modified copy of PruneStack in https://github.com/onsi/ginkgo/blob/f90f37d87fa6b1dd9625e2b1e83c23ffae3de228/internal/codelocation/code_location.go#L25:
-// - simplified API and thus renamed (calls debug.Stack() instead of taking a parameter)
-// - source code filtering updated to be specific to Kubernetes
-// - optimized to use bytes and in-place slice filtering from
-//   https://github.com/golang/go/wiki/SliceTricks#filter-in-place
+//   - simplified API and thus renamed (calls debug.Stack() instead of taking a parameter)
+//   - source code filtering updated to be specific to Kubernetes
+//   - optimized to use bytes and in-place slice filtering from
+//     https://github.com/golang/go/wiki/SliceTricks#filter-in-place
 func PrunedStack(skip int) []byte {
 	fullStackTrace := debug.Stack()
 	stack := bytes.Split(fullStackTrace, []byte("\n"))

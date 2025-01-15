@@ -1,23 +1,10 @@
-/*
-Copyright 2020 The KubeSphere Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package authorizer
 
 import (
 	"net/http"
+
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -51,9 +38,6 @@ type Attributes interface {
 	// The namespace of the object, if a request is for a REST object.
 	GetNamespace() string
 
-	// The devops project of the object, if a request is for a REST object.
-	GetDevOps() string
-
 	// The kind of object, if a request is for a REST object.
 	GetResource() string
 
@@ -79,6 +63,16 @@ type Attributes interface {
 
 	// GetPath returns the path of the request
 	GetPath() string
+
+	// ParseFieldSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the field selector cannot be parsed.
+	// The returned requirements must be treated as readonly and not modified.
+	GetFieldSelector() (fields.Requirements, error)
+
+	// ParseLabelSelector is lazy, thread-safe, and stores the parsed result and error.
+	// It returns an error if the label selector cannot be parsed.
+	// The returned requirements must be treated as readonly and not modified.
+	GetLabelSelector() (labels.Requirements, error)
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -112,7 +106,6 @@ type AttributesRecord struct {
 	Cluster           string
 	Workspace         string
 	Namespace         string
-	DevOps            string
 	APIGroup          string
 	APIVersion        string
 	Resource          string
@@ -122,6 +115,14 @@ type AttributesRecord struct {
 	ResourceRequest   bool
 	Path              string
 	ResourceScope     string
+}
+
+func (a AttributesRecord) GetFieldSelector() (fields.Requirements, error) {
+	return fields.Requirements{}, nil
+}
+
+func (a AttributesRecord) GetLabelSelector() (labels.Requirements, error) {
+	return labels.Requirements{}, nil
 }
 
 func (a AttributesRecord) GetUser() user.Info {
@@ -146,10 +147,6 @@ func (a AttributesRecord) GetWorkspace() string {
 
 func (a AttributesRecord) GetNamespace() string {
 	return a.Namespace
-}
-
-func (a AttributesRecord) GetDevOps() string {
-	return a.DevOps
 }
 
 func (a AttributesRecord) GetResource() string {

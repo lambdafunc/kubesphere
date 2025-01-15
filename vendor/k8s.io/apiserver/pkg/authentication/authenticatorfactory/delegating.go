@@ -20,9 +20,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-openapi/spec"
-
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
 	"k8s.io/apiserver/pkg/authentication/request/anonymous"
@@ -32,17 +31,19 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // DelegatingAuthenticatorConfig is the minimal configuration needed to create an authenticator
 // built to delegate authentication to a kube API server
 type DelegatingAuthenticatorConfig struct {
-	Anonymous bool
+	Anonymous *apiserver.AnonymousAuthConfig
 
 	// TokenAccessReviewClient is a client to do token review. It can be nil. Then every token is ignored.
-	TokenAccessReviewClient authenticationclient.TokenReviewInterface
+	TokenAccessReviewClient authenticationclient.AuthenticationV1Interface
 
 	// TokenAccessReviewTimeout specifies a time limit for requests made by the authorization webhook client.
 	TokenAccessReviewTimeout time.Duration
@@ -58,7 +59,7 @@ type DelegatingAuthenticatorConfig struct {
 	// CAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
 	// If this is nil, then mTLS will not be used.
-	ClientCertificateCAContentProvider CAContentProvider
+	ClientCertificateCAContentProvider dynamiccertificates.CAContentProvider
 
 	APIAudiences authenticator.Audiences
 
@@ -91,7 +92,10 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 		if c.WebhookRetryBackoff == nil {
 			return nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
 		}
-		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout)
+		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout, webhooktoken.AuthenticatorMetrics{
+			RecordRequestTotal:   RecordRequestTotal,
+			RecordRequestLatency: RecordRequestLatency,
+		})
 		if err != nil {
 			return nil, nil, err
 		}
@@ -109,15 +113,15 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	}
 
 	if len(authenticators) == 0 {
-		if c.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+		if c.Anonymous != nil && c.Anonymous.Enabled {
+			return anonymous.NewAuthenticator(c.Anonymous.Conditions), &securityDefinitions, nil
 		}
-		return nil, nil, errors.New("No authentication method configured")
+		return nil, nil, errors.New("no authentication method configured")
 	}
 
 	authenticator := group.NewAuthenticatedGroupAdder(unionauth.New(authenticators...))
-	if c.Anonymous {
-		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator())
+	if c.Anonymous != nil && c.Anonymous.Enabled {
+		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator(c.Anonymous.Conditions))
 	}
 	return authenticator, &securityDefinitions, nil
 }

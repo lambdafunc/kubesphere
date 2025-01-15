@@ -1,18 +1,7 @@
 /*
-Copyright 2020 KubeSphere Authors
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package registries
 
@@ -22,7 +11,7 @@ import (
 	"net/http"
 
 	"github.com/docker/distribution/manifest/schema2"
-	log "k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // Digest returns the digest for an image.
@@ -50,7 +39,7 @@ func (r *Registry) ImageBlob(image Image, token string) (*ImageBlob, error) {
 	respBody, _ := GetRespBody(resp)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
-		log.Errorf("got response: statusCode is '%d', body is '%s'\n", resp.StatusCode, respBody)
+		klog.Errorf("got response: statusCode is '%d', body is '%s'\n", resp.StatusCode, respBody)
 		return nil, fmt.Errorf("got image blob faild")
 	}
 

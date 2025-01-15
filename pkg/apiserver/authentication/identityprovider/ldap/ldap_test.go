@@ -1,18 +1,7 @@
 /*
-Copyright 2020 The KubeSphere Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package ldap
 
@@ -20,14 +9,14 @@ import (
 	"os"
 	"testing"
 
+	"kubesphere.io/kubesphere/pkg/server/options"
+
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
-
-	"kubesphere.io/kubesphere/pkg/apiserver/authentication/oauth"
 )
 
 func TestNewLdapProvider(t *testing.T) {
-	options := `
+	opts := `
 host: test.sn.mynetname.net:389
 managerDN: uid=root,cn=users,dc=test,dc=sn,dc=mynetname,dc=net
 managerPassword: test
@@ -36,8 +25,8 @@ userSearchBase: dc=test,dc=sn,dc=mynetname,dc=net
 loginAttribute: uid
 mailAttribute: mail
 `
-	var dynamicOptions oauth.DynamicOptions
-	err := yaml.Unmarshal([]byte(options), &dynamicOptions)
+	var dynamicOptions options.DynamicOptions
+	err := yaml.Unmarshal([]byte(opts), &dynamicOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,12 +62,12 @@ func TestLdapProvider_Authenticate(t *testing.T) {
 	if configFile == "" {
 		t.Skip("Skipped")
 	}
-	options, err := os.ReadFile(configFile)
+	opts, err := os.ReadFile(configFile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var dynamicOptions oauth.DynamicOptions
-	if err = yaml.Unmarshal(options, &dynamicOptions); err != nil {
+	var dynamicOptions options.DynamicOptions
+	if err = yaml.Unmarshal(opts, &dynamicOptions); err != nil {
 		t.Fatal(err)
 	}
 	ldapProvider, err := new(ldapProviderFactory).Create(dynamicOptions)

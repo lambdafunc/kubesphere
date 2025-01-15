@@ -1,20 +1,7 @@
 /*
-
- Copyright 2020 The KubeSphere Authors.
-
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
-
-     http://www.apache.org/licenses/LICENSE-2.0
-
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
-
-*/
+ * Please refer to the LICENSE file in the root directory of the project.
+ * https://github.com/kubesphere/kubesphere/blob/master/LICENSE
+ */
 
 package github
 
@@ -27,14 +14,15 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"kubesphere.io/kubesphere/pkg/server/options"
+
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 	"golang.org/x/oauth2"
 	"gopkg.in/yaml.v3"
 
 	"kubesphere.io/kubesphere/pkg/apiserver/authentication/identityprovider"
-	"kubesphere.io/kubesphere/pkg/apiserver/authentication/oauth"
 )
 
 var githubServer *httptest.Server
@@ -44,7 +32,7 @@ func TestGithub(t *testing.T) {
 	RunSpecs(t, "GitHub Identity Provider Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
 	githubServer = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var data map[string]interface{}
 		switch r.RequestURI {
@@ -68,8 +56,7 @@ var _ = BeforeSuite(func(done Done) {
 		w.Header().Add("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(data)
 	}))
-	close(done)
-}, 60)
+})
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
@@ -119,12 +106,12 @@ scopes:
 			Expect(provider).Should(Equal(expected))
 		})
 		It("should configure successfully", func() {
-			config := oauth.DynamicOptions{
+			config := options.DynamicOptions{
 				"clientID":           "de6ff8bed0304e487b6e",
 				"clientSecret":       "2b70536f79ec8d2939863509d05e2a71c268b9af",
 				"redirectURL":        "https://ks-console.kubesphere-system.svc/oauth/redirect/github",
 				"insecureSkipVerify": true,
-				"endpoint": oauth.DynamicOptions{
+				"endpoint": options.DynamicOptions{
 					"authURL":     fmt.Sprintf("%s/login/oauth/authorize", githubServer.URL),
 					"tokenURL":    fmt.Sprintf("%s/login/oauth/access_token", githubServer.URL),
 					"userInfoURL": fmt.Sprintf("%s/user", githubServer.URL),
@@ -133,12 +120,12 @@ scopes:
 			factory := ldapProviderFactory{}
 			provider, err = factory.Create(config)
 			Expect(err).Should(BeNil())
-			expected := oauth.DynamicOptions{
+			expected := options.DynamicOptions{
 				"clientID":           "de6ff8bed0304e487b6e",
 				"clientSecret":       "2b70536f79ec8d2939863509d05e2a71c268b9af",
 				"redirectURL":        "https://ks-console.kubesphere-system.svc/oauth/redirect/github",
 				"insecureSkipVerify": true,
-				"endpoint": oauth.DynamicOptions{
+				"endpoint": options.DynamicOptions{
 					"authURL":     fmt.Sprintf("%s/login/oauth/authorize", githubServer.URL),
 					"tokenURL":    fmt.Sprintf("%s/login/oauth/access_token", githubServer.URL),
 					"userInfoURL": fmt.Sprintf("%s/user", githubServer.URL),
@@ -158,8 +145,8 @@ scopes:
 	})
 })
 
-func mustUnmarshalYAML(data string) oauth.DynamicOptions {
-	var dynamicOptions oauth.DynamicOptions
+func mustUnmarshalYAML(data string) options.DynamicOptions {
+	var dynamicOptions options.DynamicOptions
 	_ = yaml.Unmarshal([]byte(data), &dynamicOptions)
 	return dynamicOptions
 }

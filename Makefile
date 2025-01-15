@@ -1,16 +1,6 @@
-# Copyright 2018 The KubeSphere Authors. All rights reserved.
-# Use of this source code is governed by a Apache license
-# that can be found in the LICENSE file.
-
-
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true,allowDangerousTypes=true"
-
-GV="network:v1alpha1 servicemesh:v1alpha2 tenant:v1alpha1 tenant:v1alpha2 devops:v1alpha1 iam:v1alpha2 devops:v1alpha3 cluster:v1alpha1 storage:v1alpha1 auditing:v1alpha1 types:v1beta1 types:v1beta2 quota:v1alpha2 application:v1alpha1 notification:v2beta1 notification:v2beta2 gateway:v1alpha1 alerting:v2beta1"
-MANIFESTS="application/* cluster/* iam/* network/v1alpha1 quota/* storage/* tenant/* gateway/* alerting/*"
-
-# App Version
-APP_VERSION = v3.2.0
+CRD_OPTIONS ?= "crd:allowDangerousTypes=true"
+MANIFESTS="cluster/v1alpha1 iam/... quota/v1alpha2 storage/v1alpha1 tenant/... extensions/v1alpha1 core/v1alpha1 gateway/v1alpha2 application/v2"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -75,7 +65,7 @@ kind-e2e: ;$(info $(M)...Run e2e test.) @ ## Run e2e test in kind.
 
 # Run go fmt against code
 fmt: ;$(info $(M)...Begin to run go fmt against code.)  @ ## Run go fmt against code.
-	gofmt -w ./pkg ./cmd ./tools ./api
+	gofmt -w ./pkg ./cmd ./tools ./api ./staging ./kube
 
 # Format all import, `goimports` is required.
 goimports: ;$(info $(M)...Begin to Format all import.)  @ ## Format all import, `goimports` is required.
@@ -101,13 +91,8 @@ deepcopy: ;$(info $(M)...Begin to deepcopy.)  @ ## Deepcopy.
 	hack/generate_manifests.sh ${CRD_OPTIONS} ${MANIFESTS} "deepcopy"
 
 openapi: ;$(info $(M)...Begin to openapi.)  @ ## Openapi.
-	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/tenant/v1alpha1 -p kubesphere.io/api/tenant/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
-	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/network/v1alpha1 -p kubesphere.io/api/network/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
-	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/servicemesh/v1alpha2 -p kubesphere.io/api/servicemesh/v1alpha2 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
-	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/api/networking/v1,./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/k8s.io/apimachinery/pkg/util/intstr,./vendor/kubesphere.io/api/network/v1alpha1 -p kubesphere.io/api/network/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
-	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/devops/v1alpha1,./vendor/k8s.io/apimachinery/pkg/runtime,./vendor/k8s.io/api/core/v1 -p kubesphere.io/api/devops/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
+	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/tenant/v1beta1 -p kubesphere.io/api/tenant/v1beta1 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
 	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/cluster/v1alpha1,./vendor/k8s.io/apimachinery/pkg/runtime,./vendor/k8s.io/api/core/v1 -p kubesphere.io/api/cluster/v1alpha1 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
-	go run ./vendor/k8s.io/kube-openapi/cmd/openapi-gen/openapi-gen.go -O openapi_generated -i ./vendor/k8s.io/apimachinery/pkg/apis/meta/v1,./vendor/kubesphere.io/api/devops/v1alpha3,./vendor/k8s.io/apimachinery/pkg/runtime -p kubesphere.io/api/devops/v1alpha3 -h ./hack/boilerplate.go.txt --report-filename ./api/api-rules/violation_exceptions.list  --output-base=staging/src/
 	go run ./tools/cmd/crd-doc-gen/main.go
 	go run ./tools/cmd/doc-gen/main.go
 
@@ -124,39 +109,30 @@ container-cross-push: ; $(info $(M)...Begin to build and push.)  @ ## Build and 
 	hack/docker_build_multiarch.sh
 
 helm-package: ; $(info $(M)...Begin to helm-package.)  @ ## Helm-package.
-	ls config/crds/ | xargs -i cp -r config/crds/{} config/ks-core/crds/
-	helm package config/ks-core --app-version=${APP_VERSION} --version=0.1.0 -d ./bin
+	helm package config/ks-core -d ./bin
 
 helm-deploy: ; $(info $(M)...Begin to helm-deploy.)  @ ## Helm-deploy.
-	ls config/crds/ | xargs -i cp -r config/crds/{} config/ks-core/crds/
 	- kubectl create ns kubesphere-controls-system
 	helm upgrade --install ks-core ./config/ks-core -n kubesphere-system --create-namespace
-	kubectl apply -f https://raw.githubusercontent.com/kubesphere/ks-installer/master/roles/ks-core/prepare/files/ks-init/role-templates.yaml
 
 helm-uninstall: ; $(info $(M)...Begin to helm-uninstall.)  @ ## Helm-uninstall.
 	- kubectl delete ns kubesphere-controls-system
 	helm uninstall ks-core -n kubesphere-system
-	kubectl delete -f https://raw.githubusercontent.com/kubesphere/ks-installer/master/roles/ks-core/prepare/files/ks-init/role-templates.yaml
 
 # Run tests
-ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
 test: vet test-env ;$(info $(M)...Begin to run tests.)  @ ## Run tests.
-	export KUBEBUILDER_ASSETS=$(shell pwd)/testbin/bin; go test ./pkg/... ./cmd/... -covermode=atomic -coverprofile=coverage.txt
+	go test ./pkg/... ./cmd/... -covermode=atomic -coverprofile=coverage.txt
 	cd staging/src/kubesphere.io/api ; GOFLAGS="" go test ./...
 	cd staging/src/kubesphere.io/client-go ; GOFLAGS="" go test ./...
 
 .PHONY: test-env
 test-env: ;$(info $(M)...Begin to setup test env) @ ## Download unit test libraries e.g. kube-apiserver etcd.
-	@hack/setup-kubebuilder-env.sh
+	@hack/setup-envtest.sh
 
 .PHONY: clean
 clean: ;$(info $(M)...Begin to clean.)  @ ## Clean.
 	-make -C ./pkg/version clean
 	@echo "ok"
-
-# Deprecated clientset cause we will replace code-generate with controller-runtime cache
-clientset:  ;$(info $(M)...Begin to find or download controller-gen.)  @ ## Find or download controller-gen,download controller-gen if necessary.
-	./hack/generate_client.sh ${GV}
 
 # Fix invalid file's license.
 update-licenses: ;$(info $(M)...Begin to update licenses.)

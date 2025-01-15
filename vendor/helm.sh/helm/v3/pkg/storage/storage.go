@@ -55,8 +55,8 @@ func (s *Storage) Get(name string, version int) (*rspb.Release, error) {
 }
 
 // Create creates a new storage entry holding the release. An
-// error is returned if the storage driver failed to store the
-// release, or a release with identical an key already exists.
+// error is returned if the storage driver fails to store the
+// release, or a release with an identical key already exists.
 func (s *Storage) Create(rls *rspb.Release) error {
 	s.Log("creating release %q", makeKey(rls.Name, rls.Version))
 	if s.MaxHistory > 0 {
@@ -111,7 +111,7 @@ func (s *Storage) ListDeployed() ([]*rspb.Release, error) {
 }
 
 // Deployed returns the last deployed release with the provided release name, or
-// returns ErrReleaseNotFound if not found.
+// returns driver.NewErrNoDeployedReleases if not found.
 func (s *Storage) Deployed(name string) (*rspb.Release, error) {
 	ls, err := s.DeployedAll(name)
 	if err != nil {
@@ -130,7 +130,7 @@ func (s *Storage) Deployed(name string) (*rspb.Release, error) {
 }
 
 // DeployedAll returns all deployed releases with the provided name, or
-// returns ErrReleaseNotFound if not found.
+// returns driver.NewErrNoDeployedReleases if not found.
 func (s *Storage) DeployedAll(name string) ([]*rspb.Release, error) {
 	s.Log("getting deployed releases from %q history", name)
 
@@ -149,7 +149,7 @@ func (s *Storage) DeployedAll(name string) ([]*rspb.Release, error) {
 }
 
 // History returns the revision history for the release with the provided name, or
-// returns ErrReleaseNotFound if no such release name exists.
+// returns driver.ErrReleaseNotFound if no such release name exists.
 func (s *Storage) History(name string) ([]*rspb.Release, error) {
 	s.Log("getting release history for %q", name)
 
@@ -177,7 +177,7 @@ func (s *Storage) removeLeastRecent(name string, max int) error {
 	relutil.SortByRevision(h)
 
 	lastDeployed, err := s.Deployed(name)
-	if err != nil {
+	if err != nil && !errors.Is(err, driver.ErrNoDeployedReleases) {
 		return err
 	}
 
